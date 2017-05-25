@@ -206,7 +206,9 @@
     "MyVPCGatewayA": {
       "Type": "AWS::EC2::NatGateway",
       "Properties": {
-        "AllocationId" : { "Fn::GetAtt" : ["MyVPCEIPA", "AllocationId"]},
+        "AllocationId": {
+          "Fn::GetAtt": ["MyVPCEIPA", "AllocationId"]
+        },
         "SubnetId": {
           "Ref": "MyVPCPublicSubnetA"
         }
@@ -216,7 +218,9 @@
     "MyVPCGatewayB": {
       "Type": "AWS::EC2::NatGateway",
       "Properties": {
-        "AllocationId" : { "Fn::GetAtt" : ["MyVPCEIPB", "AllocationId"]},
+        "AllocationId": {
+          "Fn::GetAtt": ["MyVPCEIPB", "AllocationId"]
+        },
         "SubnetId": {
           "Ref": "MyVPCPublicSubnetB"
         }
@@ -248,7 +252,7 @@
       },
       "Type": "AWS::EC2::RouteTable"
     },
-    
+
     "MyVPCPrivateSubnetARouteTable": {
       "Properties": {
         "Tags": [{
@@ -395,8 +399,7 @@
         "VpcId": {
           "Ref": "MyVPC"
         },
-        "SecurityGroupIngress": [
-          {
+        "SecurityGroupIngress": [{
             "CidrIp": "0.0.0.0/0",
             "FromPort": "80",
             "IpProtocol": "tcp",
@@ -416,7 +419,7 @@
           }
         ]
       }
-    },    
+    },
 
     "MyVPCPrivateInstanceSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
@@ -425,8 +428,7 @@
         "VpcId": {
           "Ref": "MyVPC"
         },
-        "SecurityGroupIngress": [
-          {
+        "SecurityGroupIngress": [{
             "CidrIp": "10.0.1.0/24",
             "FromPort": "0",
             "IpProtocol": "tcp",
@@ -439,6 +441,263 @@
             "ToPort": "65535"
           }
         ]
+      }
+    },
+
+    "MyVPCWebLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "EbsOptimized": false,
+        "ImageId": "ami-c58c1dd3",
+        "InstanceType": "t2.micro",
+        "KeyName": "mfellows-dev-virginia",
+        "SecurityGroups": [{
+          "Ref": "MyVPCPublicInstanceSecurityGroup"
+        }],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": ["", [
+              "#!/bin/bash\n",
+              "yum install httpd -y\n",
+              "yum update -y\n",
+              "service httpd start\n",
+              "chkconfig httpd on\n",
+              "echo '<html><h1>HA instance from some server</h1></html>' > /var/www/html/index.html\n"
+            ]]
+          }
+        }
+      }
+    },
+
+    "MyVPCWebALB": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Name": "MyVPCWebALB",
+        "Scheme": "internet-facing",
+        "SecurityGroups": [{
+          "Ref": "MyVPCPublicInstanceSecurityGroup"
+        }],
+        "Subnets": [{
+            "Ref": "MyVPCPublicSubnetA"
+          },
+          {
+            "Ref": "MyVPCPublicSubnetB"
+          }
+        ],
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPCPrivateSubnetBRouteTable"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows@dius.com.au"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ]
+      }
+    },
+
+    "MyVPCWebALBTargetGroup": {
+      "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties" : {
+        "HealthCheckIntervalSeconds" : 30,
+        "HealthCheckPath" : "/",
+        "HealthCheckPort" : 80,
+        "HealthCheckProtocol" : "HTTP",
+        "HealthCheckTimeoutSeconds" : 10,
+        "HealthyThresholdCount" : 2,
+        "Name" : "MyVPCWebALBTargetGroup",
+        "Port" : 80,
+        "Protocol" : "HTTP",
+        "Tags" : [ 
+          {
+            "Key": "Name",
+            "Value": "MyVPCALBTargetGroup"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows@dius.com.au"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }          
+
+        ],
+        "UnhealthyThresholdCount" : 5,
+        "VpcId" : {"Ref": "MyVPC"}
+      }
+    },
+
+    "MyVPCWebALBListener": {
+      "Type" : "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties" : {
+        "DefaultActions" : [ 
+          {
+            "TargetGroupArn" : {"Ref": "MyVPCWebALBTargetGroup"},
+            "Type" : "forward"
+          }          
+        ],
+        "LoadBalancerArn" : {"Ref": "MyVPCWebALB"},
+        "Port" : 80,
+        "Protocol" : "HTTP"
+      }
+    },
+
+    "MyVPCWebASG": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": ["us-east-1a", "us-east-1b"],
+        "VPCZoneIdentifier": [
+          {
+            "Ref": "MyVPCPublicSubnetA"
+          },
+          {
+            "Ref": "MyVPCPublicSubnetB"
+          }
+        ],      
+        "DesiredCapacity": "2",
+        "HealthCheckGracePeriod": 60,
+        "HealthCheckType": "ELB",
+        "LaunchConfigurationName": {
+          "Ref": "MyVPCWebLaunchConfiguration"
+        },
+        "MaxSize": "4",
+        "MinSize": "2",
+        "Tags": [{
+            "Key": "Name",
+            "PropagateAtLaunch": "true",
+            "Value": "Web Instance ASG"
+          },
+          {
+            "Key": "owner",
+            "PropagateAtLaunch": "true",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "PropagateAtLaunch": "true",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "PropagateAtLaunch": "true",
+            "Value": "2017-05-28"
+          }
+        ],
+        "TargetGroupARNs": [{
+          "Ref": "MyVPCWebALBTargetGroup"
+        }]
+      },
+      "UpdatePolicy": {
+        "AutoScalingRollingUpdate": {
+          "MinInstancesInService": "2",
+          "MaxBatchSize": "1",
+          "PauseTime": "PT2M"
+        }
+      }      
+    },
+
+    "MyVPCPrivateInstanceA": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "AvailabilityZone": "us-east-1a",
+        "EbsOptimized": false,
+        "ImageId": "ami-c58c1dd3",
+        "InstanceType": "t2.micro",
+        "KeyName": "mfellows-dev-virginia",
+        "SecurityGroupIds": [{
+          "Ref": "MyVPCPrivateInstanceSecurityGroup"
+        }],
+        "SubnetId": {
+          "Ref": "MyVPCPrivateSubnetA"
+        },
+        "Tags": [{
+            "Key": "Name",
+            "Value": "Web Instance"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": ["", [
+              "#!/bin/bash\n",
+              "yum install httpd -y\n",
+              "yum update -y\n",
+              "service httpd start\n",
+              "chkconfig httpd on\n",
+              "echo '<html><h1>HA instance from some server</h1></html>' > /var/www/html/index.html\n"
+            ]]
+          }
+        }
+      }
+    },
+
+    "MyVPCPrivateInstanceB": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "EbsOptimized": false,
+        "ImageId": "ami-c58c1dd3",
+        "InstanceType": "t2.micro",
+        "KeyName": "mfellows-dev-virginia",
+        "SecurityGroupIds": [{
+          "Ref": "MyVPCPrivateInstanceSecurityGroup"
+        }],
+        "SubnetId": {
+          "Ref": "MyVPCPrivateSubnetB"
+        },
+        "Tags": [{
+            "Key": "Name",
+            "Value": "Web Instance"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": ["", [
+              "#!/bin/bash\n",
+              "yum install httpd -y\n",
+              "yum update -y\n",
+              "service httpd start\n",
+              "chkconfig httpd on\n",
+              "echo '<html><h1>HA instance from some server</h1></html>' > /var/www/html/index.html\n"
+            ]]
+          }
+        }
       }
     }
   },
