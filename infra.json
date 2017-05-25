@@ -1,0 +1,447 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+
+  "Description": "AWS VPC Setup with public and private subnets",
+
+  "Metadata": {
+    "ReasonForLiving": "Matt AWS certification tests"
+  },
+
+  "Parameters": {},
+
+  "Resources": {
+
+    "MyVPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "InstanceTenancy": "default",
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPC"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ]
+      }
+    },
+
+    "MyVPCPublicSubnetA": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-1a",
+        "CidrBlock": "10.0.1.0/24",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyPublicSubnetA"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      }
+    },
+
+    "MyVPCPublicSubnetB": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "CidrBlock": "10.0.2.0/24",
+        "MapPublicIpOnLaunch": true,
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyPublicSubnetB"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      }
+    },
+
+    "MyVPCPrivateSubnetA": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-1a",
+        "CidrBlock": "10.0.3.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyPrivateSubnetA"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      }
+    },
+
+    "MyVPCPrivateSubnetB": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "CidrBlock": "10.0.4.0/24",
+        "MapPublicIpOnLaunch": false,
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyPrivateSubnetB"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      }
+    },
+
+    "MyVPCInternetGateway": {
+      "Properties": {
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPCInternetGateway"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ]
+      },
+      "Type": "AWS::EC2::InternetGateway"
+    },
+
+    "VPCGatewayAttachment": {
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "MyVPCInternetGateway"
+        },
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      },
+      "Type": "AWS::EC2::VPCGatewayAttachment"
+    },
+
+    "MyVPCEIPA": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+
+    "MyVPCEIPB": {
+      "Type": "AWS::EC2::EIP",
+      "Properties": {
+        "Domain": "vpc"
+      }
+    },
+
+    "MyVPCGatewayA": {
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId" : { "Fn::GetAtt" : ["MyVPCEIPA", "AllocationId"]},
+        "SubnetId": {
+          "Ref": "MyVPCPublicSubnetA"
+        }
+      }
+    },
+
+    "MyVPCGatewayB": {
+      "Type": "AWS::EC2::NatGateway",
+      "Properties": {
+        "AllocationId" : { "Fn::GetAtt" : ["MyVPCEIPB", "AllocationId"]},
+        "SubnetId": {
+          "Ref": "MyVPCPublicSubnetB"
+        }
+      }
+    },
+
+    "MyVPCPublicSubnetRouteTable": {
+      "Properties": {
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPCPublicSubnetRouteTable"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows@dius.com.au"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+    
+    "MyVPCPrivateSubnetARouteTable": {
+      "Properties": {
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPCPrivateSubnetARouteTable"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows@dius.com.au"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+
+    "MyVPCPrivateSubnetBRouteTable": {
+      "Properties": {
+        "Tags": [{
+            "Key": "Name",
+            "Value": "MyVPCPrivateSubnetBRouteTable"
+          },
+          {
+            "Key": "purpose",
+            "Value": "Matt AWS Certification tests"
+          },
+          {
+            "Key": "owner",
+            "Value": "mfellows@dius.com.au"
+          },
+          {
+            "Key": "expiry",
+            "Value": "2017-05-28"
+          }
+        ],
+        "VpcId": {
+          "Ref": "MyVPC"
+        }
+      },
+      "Type": "AWS::EC2::RouteTable"
+    },
+
+    "MyVPCRoutePublicSubnetToInternet": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "MyVPCInternetGateway"
+        },
+        "RouteTableId": {
+          "Ref": "MyVPCPublicSubnetRouteTable"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+
+    "MyVPCPublicSubnetARouteTableAssociation": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "MyVPCPublicSubnetRouteTable"
+        },
+        "SubnetId": {
+          "Ref": "MyVPCPublicSubnetA"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+
+    "MyVPCPublicSubnetBRouteTableAssociation": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "MyVPCPublicSubnetRouteTable"
+        },
+        "SubnetId": {
+          "Ref": "MyVPCPublicSubnetB"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+
+    "MyVPCRoutePrivateSubnetAToNAT": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "MyVPCGatewayA"
+        },
+        "RouteTableId": {
+          "Ref": "MyVPCPrivateSubnetARouteTable"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+
+    "MyVPCRoutePrivateSubnetBToNAT": {
+      "Properties": {
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "MyVPCGatewayB"
+        },
+        "RouteTableId": {
+          "Ref": "MyVPCPrivateSubnetBRouteTable"
+        }
+      },
+      "Type": "AWS::EC2::Route"
+    },
+
+    "MyVPCPrivateSubnetARouteTableAssociation": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "MyVPCPrivateSubnetARouteTable"
+        },
+        "SubnetId": {
+          "Ref": "MyVPCPrivateSubnetA"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+
+    "MyVPCPrivateSubnetBRouteTableAssociation": {
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "MyVPCPrivateSubnetBRouteTable"
+        },
+        "SubnetId": {
+          "Ref": "MyVPCPrivateSubnetB"
+        }
+      },
+      "Type": "AWS::EC2::SubnetRouteTableAssociation"
+    },
+
+    "MyVPCPublicInstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Route internet traffic to public instances",
+        "VpcId": {
+          "Ref": "MyVPC"
+        },
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "80",
+            "IpProtocol": "tcp",
+            "ToPort": "80"
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "443",
+            "IpProtocol": "tcp",
+            "ToPort": "443"
+          },
+          {
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": "22",
+            "IpProtocol": "tcp",
+            "ToPort": "22"
+          }
+        ]
+      }
+    },    
+
+    "MyVPCPrivateInstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Route internet traffic to Private instances",
+        "VpcId": {
+          "Ref": "MyVPC"
+        },
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "10.0.1.0/24",
+            "FromPort": "0",
+            "IpProtocol": "tcp",
+            "ToPort": "65535"
+          },
+          {
+            "CidrIp": "10.0.2.0/24",
+            "FromPort": "080",
+            "IpProtocol": "tcp",
+            "ToPort": "65535"
+          }
+        ]
+      }
+    }
+  },
+
+  "Outputs": {}
+}
